@@ -1,11 +1,23 @@
+import 'dart:html';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/gestures.dart';
 
-final othelloProvider = StateProvider(
-    (ref) => List.generate(8, (_) => List.generate(8, (_) => -1)));
+final othelloProvider = StateProvider((ref) => [
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, -1, 1, 0, 0, 0],
+      [0, 0, 0, 1, -1, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0]
+    ]);
 
-final playerProvider = StateProvider((ref) => 1);
+final playerProvider = StateProvider((ref) => -1);
+
+const int maxRange = 8;
 
 void main() {
   runApp(
@@ -28,20 +40,24 @@ class MyApp extends ConsumerWidget {
 
     return MaterialApp(
       home: Scaffold(
-          appBar: AppBar(title: const Text('おせろだよ〜')),
+          appBar: AppBar(
+              backgroundColor: Color.fromARGB(255, 204, 150, 182),
+              title: const Text('かわいいおせろだよ〜')),
           body: Column(
             children: [
               SizedBox(height: 16),
               playerName(ref.watch(playerProvider)),
               SizedBox(height: 16),
-              for (int i = 0; i < 8; i++)
+              for (int i = 0; i < maxRange; i++)
                 Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  for (int j = 0; j < 8; j++)
+                  for (int j = 0; j < maxRange; j++)
                     GestureDetector(
                         behavior: HitTestBehavior.translucent,
-                        onTap: () {
-                          othelloFunction(
+                        onTap: () async {
+                          // othelloArrayの値を変更する
+                          othelloArray.state = await othelloFunction(
                               i, j, ref.watch(othelloProvider), player.state);
+                          print(othelloArray.state);
                           // playerの値を変更する
                           player.state = player.state * -1;
                         },
@@ -49,10 +65,13 @@ class MyApp extends ConsumerWidget {
                           width: 50,
                           height: 50,
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.black, width: 1),
-                            color: Colors.green,
+                            border: Border.all(
+                                color: Color.fromARGB(255, 22, 71, 22),
+                                width: 1),
+                            color: Color.fromARGB(255, 138, 185, 141),
                           ),
-                          child: pawnText(ref.watch(othelloProvider)[i][j]),
+                          child: pawnText(
+                              i, j, ref.watch(othelloProvider), player.state),
                         ))
                 ])
             ],
@@ -63,20 +82,62 @@ class MyApp extends ConsumerWidget {
   Widget playerName(int player) {
     var playerName = "";
     if (player == 1) {
-      playerName = "黒";
-    } else if (player == -1) {
       playerName = "白";
+    } else if (player == -1) {
+      playerName = "桃";
     }
     return Text("プレイヤー$playerNameの番です");
   }
 
-  Widget pawnText(int value) {
+  canPutPawn(int i, int j, othelloArray, player) {
+    var canPut = false;
+    if (othelloArray[i][j] != 0) {
+      return canPut;
+    }
+    List<List<int>> vecList = [
+      [0, 1],
+      [1, 1],
+      [1, 0],
+      [1, -1],
+      [0, -1],
+      [-1, -1],
+      [-1, 0],
+      [-1, 1]
+    ];
+
+    for (int k = 0; k < 8; k++) {
+      int x = i;
+      int y = j;
+      while (true) {
+        x += vecList[k][0];
+        y += vecList[k][1];
+        if (x < 0 || x > maxRange - 1 || y < 0 || y > maxRange - 1) {
+          break;
+        }
+        if (othelloArray[x][y] == 0) {
+          break;
+        }
+        if (othelloArray[x][y] == player) {
+          canPut = true;
+        }
+      }
+    }
+    return canPut;
+  }
+
+  Widget pawnText(int i, int j, othelloArray, player) {
+    var value = othelloArray[i][j];
     var pawnText = "";
     var textColor = Colors.black;
     if (value == 0) {
-      pawnText = "";
+      if (canPutPawn(i, j, othelloArray, player)) {
+        pawnText = "○";
+      } else {
+        pawnText = "";
+      }
     } else if (value == -1) {
       pawnText = "●";
+      textColor = Color.fromARGB(255, 205, 127, 153);
     } else if (value == 1) {
       pawnText = "●";
       textColor = Colors.white;
@@ -87,11 +148,21 @@ class MyApp extends ConsumerWidget {
       style: TextStyle(
         fontSize: 30,
         color: textColor,
+        shadows: const [
+          Shadow(
+            blurRadius: 2,
+            color: Color.fromARGB(255, 20, 38, 2),
+            offset: Offset(1, 1),
+          ),
+        ],
       ),
     ));
   }
 
-  void othelloFunction(int i, int j, List<List<int>> othelloArray, int player) {
+  othelloFunction(int i, int j, List<List<int>> othelloArray, int player) {
+    if (othelloArray[i][j] != 0) {
+      //
+    }
     List<List<int>> vecList = [
       [0, 1],
       [1, 1],
@@ -103,36 +174,32 @@ class MyApp extends ConsumerWidget {
       [-1, 1]
     ];
     //次の盤面
-    List<List<int>> othelloNext =
-        List.generate(8, (_) => List.generate(8, (_) => 1));
+    List<List<int>> othelloNext = []
+      ..addAll(othelloArray.map((e) => []..addAll(e)));
+    othelloNext[i][j] = player;
     for (int k = 0; k < 8; k++) {
       int x = i;
       int y = j;
       while (true) {
         x += vecList[k][0];
         y += vecList[k][1];
-        if (x < 0 || x > 7 || y < 0 || y > 7) {
+        if (x < 0 || x > maxRange - 1 || y < 0 || y > maxRange - 1) {
           break;
         }
         if (othelloArray[x][y] == 0) {
           break;
         }
         if (othelloArray[x][y] == player) {
-          for (int l = 0; l < 8; l++) {
-            int x2 = i;
-            int y2 = j;
-            while (true) {
-              x2 += vecList[l][0];
-              y2 += vecList[l][1];
-              if (x2 == x && y2 == y) {
-                break;
-              }
-              othelloNext[x2][y2] = player;
-            }
+          while ((i != x) || (j != y)) {
+            othelloNext[x][y] = player;
+            x -= vecList[k][0];
+            y -= vecList[k][1];
           }
           break;
         }
       }
     }
+
+    return othelloNext;
   }
 }
